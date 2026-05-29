@@ -5,3 +5,6 @@ __pycache__/
 # Local Kaggle dataset downloads
 creditcard.csv
 .complete/
+
+# CatBoost local training logs
+catboost_info/

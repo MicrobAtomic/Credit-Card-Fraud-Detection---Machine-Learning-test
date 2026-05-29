@@ -78,9 +78,9 @@ print(y_test.value_counts())
 model = make_pipeline( # Making a batch of automatic step 
     StandardScaler(),
     LogisticRegression(
-        C=0.1, # Small C = model more simple 
-        class_weight={0: 1, 1: 25},
-        max_iter=2000,
+        C=0.01, # Small C = model more simple
+        class_weight={0: 1, 1: 10},
+        max_iter=3000,
         random_state=RANDOM_STATE,
     ),
 )
@@ -98,7 +98,7 @@ model.fit(X_train, y_train)
 #y_pred = model.predict(X_test) # Only predicted [0, 0, 1, ...]  => here proba >= 0.5
 
 y_score = model.predict_proba(X_test)[:, 1] # All lines and only the second column => proba fraud [[0.99, 0.01], ...] => [0.01]
-THRESHOLD = 0.3
+THRESHOLD = 0.6
 y_pred = (y_score >= THRESHOLD).astype(int) # 'astype(int)' change true/false in 1/0
 
 # - Show the results

@@ -1,8 +1,7 @@
-# Random Forest model for credit card fraud detection
+# KNN model for credit card fraud detection
 
 from pathlib import Path
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -11,6 +10,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -19,6 +19,7 @@ DATA_FILE = Path(__file__).resolve().parent / "creditcard.csv"
 TARGET_COLUMN = "Class"
 TEST_SIZE = 0.2     # Batch 80/20
 RANDOM_STATE = 42   # pseudo-random, keep the same mixe
+TRAIN_NORMAL_SAMPLE_SIZE = 40000
 
 
 # - Load the data
@@ -61,34 +62,39 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y,
 )
 
-"""
-print("\n\033[94mTrain target distribution:\033[0m")
-print(y_train.value_counts())
 
-print("\n\033[94mTest target distribution:\033[0m")
-print(y_test.value_counts())
-"""
+# - Make a smaller train set for KNN
+# KNN is slow on a big train set because it compares distances with many rows
+# Keep all frauds, then add a fixed sample of normal transactions
+fraud_index = y_train[y_train == 1].index
+normal_index = y_train[y_train == 0].sample(
+    n=TRAIN_NORMAL_SAMPLE_SIZE,
+    random_state=RANDOM_STATE,
+).index
+sample_index = normal_index.union(fraud_index)
+
+X_train_small = X_train.loc[sample_index]
+y_train_small = y_train.loc[sample_index]
+
 
 # - Creating the model
-# StandardScaler is kept here to stay close to logistic-regression.py
-# RandomForestClassifier is the classification model
-# class_weight helps because fraud cases are rare
-# n_estimators = number of trees in the forest
-# n_jobs=-1 uses all available CPU cores
+# StandardScaler is important for KNN because KNN uses distances
+# KNeighborsClassifier compares a transaction with its closest neighbors
+# n_neighbors = number of neighbors used to decide
+# weights='distance' gives more importance to close neighbors
 model = make_pipeline( # Making a batch of automatic step
     StandardScaler(),
-    RandomForestClassifier(
-        n_estimators=90,
-        class_weight={0: 1, 1: 15},
-        random_state=RANDOM_STATE,
+    KNeighborsClassifier(
+        n_neighbors=9,
+        weights="distance",
         n_jobs=-1,
     ),
 )
 
 
 # - Train the model
-# The model only learns from the train data => 80% of the data set
-model.fit(X_train, y_train)
+# KNN stores the train data and uses it later to compare distances
+model.fit(X_train_small, y_train_small)
 
 
 # - Test the model
@@ -98,7 +104,7 @@ model.fit(X_train, y_train)
 #y_pred = model.predict(X_test) # Only predicted [0, 0, 1, ...]  => here proba >= 0.5
 
 y_score = model.predict_proba(X_test)[:, 1] # All lines and only the second column => proba fraud [[0.99, 0.01], ...] => [0.01]
-THRESHOLD = 0.30
+THRESHOLD = 0.2
 y_pred = (y_score >= THRESHOLD).astype(int) # 'astype(int)' change true/false in 1/0
 
 # - Show the results

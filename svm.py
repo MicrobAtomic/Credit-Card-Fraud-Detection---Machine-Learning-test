@@ -1,8 +1,7 @@
-# Random Forest model for credit card fraud detection
+# SVM model for credit card fraud detection
 
 from pathlib import Path
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -13,6 +12,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
 
 
 DATA_FILE = Path(__file__).resolve().parent / "creditcard.csv"
@@ -70,18 +70,18 @@ print(y_test.value_counts())
 """
 
 # - Creating the model
-# StandardScaler is kept here to stay close to logistic-regression.py
-# RandomForestClassifier is the classification model
+# StandardScaler is important for SVM because SVM uses distances and margins
+# LinearSVC is a linear SVM, faster than kernel SVM on a big dataset
+# C controls how strict the model is with errors
 # class_weight helps because fraud cases are rare
-# n_estimators = number of trees in the forest
-# n_jobs=-1 uses all available CPU cores
 model = make_pipeline( # Making a batch of automatic step
     StandardScaler(),
-    RandomForestClassifier(
-        n_estimators=90,
-        class_weight={0: 1, 1: 15},
+    LinearSVC(
+        C=0.001,
+        class_weight={0: 1, 1: 40},
+        dual=False,
+        max_iter=5000,
         random_state=RANDOM_STATE,
-        n_jobs=-1,
     ),
 )
 
@@ -93,12 +93,10 @@ model.fit(X_train, y_train)
 
 # - Test the model
 # y_pred contains the predicted class: 0 or 1
-# y_score contains the fraud probability
-
-#y_pred = model.predict(X_test) # Only predicted [0, 0, 1, ...]  => here proba >= 0.5
-
-y_score = model.predict_proba(X_test)[:, 1] # All lines and only the second column => proba fraud [[0.99, 0.01], ...] => [0.01]
-THRESHOLD = 0.30
+# y_score contains the SVM score, not a probability
+# A bigger score means the model is more confident about fraud
+y_score = model.decision_function(X_test)
+THRESHOLD = 0.6
 y_pred = (y_score >= THRESHOLD).astype(int) # 'astype(int)' change true/false in 1/0
 
 # - Show the results
@@ -129,7 +127,7 @@ print("\nAccuracy:", accuracy)
 print("\n\033[94mClassification report:\033[0m")
 print(classification_report(y_test, y_pred, target_names=["Normal", "Fraud"], digits=4)) # compare real with predict with 4 digits after 0.
 
-# ROC-AUC uses the fraud probabilities, not only the final 0/1 prediction
+# ROC-AUC uses the SVM scores, not only the final 0/1 prediction
 # It checks if fraud cases usually get a higher score than normal cases
 roc_auc = roc_auc_score(y_test, y_score)
 
