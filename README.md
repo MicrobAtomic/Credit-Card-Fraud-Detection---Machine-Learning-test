@@ -17,6 +17,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 python data-import.py
+python models/random-forest.py
 ```
 
 Le fichier `creditcard.csv` est telecharge localement a cote de `data-import.py`.
@@ -40,15 +41,17 @@ car ils peuvent devenir lents sur un dataset de cette taille.
 ## Fichiers
 
 - `data-import.py` : telechargement du dataset
-- `logistic-regression.py`
-- `random-forest.py`
-- `gradient-boosting.py` : utilise `HistGradientBoostingClassifier`, une version plus rapide du gradient boosting sklearn
-- `xgboost-model.py`
-- `lightgbm-model.py`
-- `catboost-model.py`
-- `knn.py`
-- `svm.py`
-- `isolation-forest.py`
+- `utils/model_utils.py` : chargement des donnees, split train/test et affichage des resultats
+- `models/logistic-regression.py`
+- `models/random-forest.py`
+- `models/gradient-boosting.py` : utilise `HistGradientBoostingClassifier`, une version plus rapide du gradient boosting sklearn
+- `models/xgboost-model.py`
+- `models/lightgbm-model.py`
+- `models/catboost-model.py`
+- `models/knn.py`
+- `models/svm.py`
+- `models/isolation-forest.py`
+- `experiments/` : tests avances avant de les ajouter au tableau principal
 
 ## Metriques compare
 
@@ -75,15 +78,15 @@ mais un petit gain en FN ne justifie pas une forte hausse des faux positifs.
 
 | Modele | Precision | Recall | F1-score | Accuracy | ROC-AUC | PR-AUC | FP | FN | Notes | Conclusion |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Random Forest | 0.9247 | 0.8776 | 0.9005 | 0.9997 | 0.9581 | 0.8678 | 7 | 12 | `StandardScaler`, `n_estimators=90`, `class_weight={0: 1, 1: 15}`, `threshold=0.3`, batch partiel : 36 modeles entraines, 540 combinaisons evaluees; option plus agressive : FP 38, FN 10 avec `n_estimators=60`, `class_weight=balanced`, `max_depth=24`, `min_samples_leaf=2`, `max_features=sqrt`, `threshold=0.1` | Meilleur compromis actuel pour Random Forest |
-| CatBoost | 0.8947 | 0.8673 | 0.8808 | 0.9996 | 0.9781 | 0.8780 | 10 | 13 | `CatBoostClassifier`, `iterations=300`, `learning_rate=0.09`, `depth=6`, `class_weights=[1, 40]`, `threshold=0.4`, `loss_function=Logloss`, `eval_metric=AUC`, petite grille : 24 configurations de modele entrainees, 120 combinaisons modele + threshold evaluees; option plus prudente : FP 6, FN 16 avec `iterations=400`, `learning_rate=0.05`, `depth=8`, `threshold=0.6` | Version retenue car elle reduit les faux negatifs |
-| XGBoost | 0.9222 | 0.8469 | 0.8830 | 0.9996 | 0.9728 | 0.8874 | 7 | 15 | `StandardScaler`, `XGBClassifier`, `n_estimators=200`, `learning_rate=0.2`, `max_depth=5`, `scale_pos_weight=25`, `threshold=0.6`, 72 modeles entraines, 648 combinaisons evaluees | Meilleur PR-AUC actuel |
-| LightGBM | 0.9111 | 0.8367 | 0.8723 | 0.9996 | 0.9717 | 0.8584 | 8 | 16 | `LGBMClassifier`, `n_estimators=200`, `learning_rate=0.03`, `max_depth=4`, `num_leaves=15`, `min_child_samples=100`, `scale_pos_weight=1`, `threshold=0.3`, 540 modeles entraines, 4968 combinaisons evaluees | Bon modele, mais moins bon que Random Forest et XGBoost sur F1-score et PR-AUC |
-| SVM | 0.8367 | 0.8367 | 0.8367 | 0.9994 | 0.9742 | 0.7516 | 16 | 16 | `StandardScaler`, `LinearSVC`, `C=0.001`, `class_weight={0: 1, 1: 40}`, `threshold=0.6`, petite grille : 25 modeles entraines, 175 combinaisons evaluees | Meilleur compromis trouve pour SVM |
-| KNN | 0.5959 | 0.8878 | 0.7131 | 0.9988 | 0.9484 | 0.8308 | 59 | 11 | `StandardScaler`, `KNeighborsClassifier`, train reduit : toutes les fraudes + 40000 transactions normales, `n_neighbors=9`, `weights=distance`, `threshold=0.2`, petite grille : 30 modeles entraines, 150 combinaisons evaluees | Version retenue car elle reduit les faux negatifs |
-| Logistic Regression | 0.7155 | 0.8469 | 0.7757 | 0.9992 | 0.9706 | 0.7449 | 33 | 15 | `StandardScaler`, `C=0.01`, `class_weight={0: 1, 1: 10}`, `threshold=0.6`, `max_iter=3000`, petite grille : 30 modeles entraines, 150 combinaisons evaluees | Meilleur compromis trouve pour Logistic Regression |
-| Gradient Boosting | 0.8889 | 0.8163 | 0.8511 | 0.9995 | 0.9792 | 0.8540 | 10 | 18 | `StandardScaler`, `HistGradientBoostingClassifier`, `learning_rate=0.05`, `max_iter=100`, `max_leaf_nodes=15`, `min_samples_leaf=20`, `class_weight={0: 1, 1: 5}`, `threshold=0.6`, 144 modeles entraines, 1296 combinaisons evaluees | Version histogram du gradient boosting sklearn car version de base trop lente |
-| Isolation Forest | 0.3509 | 0.4082 | 0.3774 | 0.9977 | 0.9612 | 0.3292 | 74 | 58 | `StandardScaler`, `IsolationForest`, `n_estimators=200`, `max_samples=4096`, `max_features=0.5`, `top_anomaly_rate=0.002`, non supervise, 48 modeles entraines, 288 combinaisons evaluees | Detecteur d'anomalies interessant, mais beaucoup moins performant que les modeles supervises sur ce dataset |
+| Random Forest | 0.9247 | 0.8776 | 0.9005 | 0.9997 | 0.9581 | 0.8678 | 7 | 12 | `StandardScaler`, `n_estimators=90`, `class_weight={0: 1, 1: 15}`, `threshold=0.3`, batch partiel : 36 modeles entraines, 540 combinaisons evaluees; option plus agressive : FP 38, FN 10 avec `n_estimators=60`, `class_weight=balanced`, `max_depth=24`, `min_samples_leaf=2`, `max_features=sqrt`, `threshold=0.1` | Meilleur choix actuel : tres bon compromis FP/FN et meilleur F1-score |
+| CatBoost | 0.8947 | 0.8673 | 0.8808 | 0.9996 | 0.9781 | 0.8780 | 10 | 13 | `CatBoostClassifier`, `iterations=300`, `learning_rate=0.09`, `depth=6`, `class_weights=[1, 40]`, `threshold=0.4`, `loss_function=Logloss`, `eval_metric=AUC`, petite grille : 24 configurations de modele entrainees, 120 combinaisons modele + threshold evaluees; option plus prudente : FP 6, FN 16 avec `iterations=400`, `learning_rate=0.05`, `depth=8`, `threshold=0.6` | Tres proche de Random Forest, avec peu de FP et peu de FN |
+| XGBoost | 0.9222 | 0.8469 | 0.8830 | 0.9996 | 0.9728 | 0.8874 | 7 | 15 | `StandardScaler`, `XGBClassifier`, `n_estimators=200`, `learning_rate=0.2`, `max_depth=5`, `scale_pos_weight=25`, `threshold=0.6`, 72 modeles entraines, 648 combinaisons evaluees | Excellent PR-AUC et tres peu de FP, mais plus de FN que Random Forest et CatBoost |
+| LightGBM | 0.9111 | 0.8367 | 0.8723 | 0.9996 | 0.9717 | 0.8584 | 8 | 16 | `LGBMClassifier`, `n_estimators=200`, `learning_rate=0.03`, `max_depth=4`, `num_leaves=15`, `min_child_samples=100`, `scale_pos_weight=1`, `threshold=0.3`, 540 modeles entraines, 4968 combinaisons evaluees | Bon modele, proche de XGBoost, mais avec un peu plus de FN |
+| SVM | 0.8367 | 0.8367 | 0.8367 | 0.9994 | 0.9742 | 0.7516 | 16 | 16 | `StandardScaler`, `LinearSVC`, `C=0.001`, `class_weight={0: 1, 1: 40}`, `threshold=0.6`, petite grille : 25 modeles entraines, 175 combinaisons evaluees | Resultat correct, mais moins competitif que les modeles d'arbres |
+| KNN | 0.5959 | 0.8878 | 0.7131 | 0.9988 | 0.9484 | 0.8308 | 59 | 11 | `StandardScaler`, `KNeighborsClassifier`, train reduit : toutes les fraudes + 40000 transactions normales, `n_neighbors=9`, `weights=distance`, `threshold=0.2`, petite grille : 30 modeles entraines, 150 combinaisons evaluees | Meilleur FN du tableau, mais beaucoup trop de FP pour passer devant les meilleurs modeles |
+| Logistic Regression | 0.7155 | 0.8469 | 0.7757 | 0.9992 | 0.9706 | 0.7449 | 33 | 15 | `StandardScaler`, `C=0.01`, `class_weight={0: 1, 1: 10}`, `threshold=0.6`, `max_iter=3000`, petite grille : 30 modeles entraines, 150 combinaisons evaluees | Bonne baseline interpretable, mais trop de FP et F1-score plus faible |
+| Gradient Boosting | 0.8889 | 0.8163 | 0.8511 | 0.9995 | 0.9792 | 0.8540 | 10 | 18 | `StandardScaler`, `HistGradientBoostingClassifier`, `learning_rate=0.05`, `max_iter=100`, `max_leaf_nodes=15`, `min_samples_leaf=20`, `class_weight={0: 1, 1: 5}`, `threshold=0.6`, 144 modeles entraines, 1296 combinaisons evaluees | Peu de FP, mais trop de FN face aux meilleurs modeles |
+| Isolation Forest | 0.3509 | 0.4082 | 0.3774 | 0.9977 | 0.9612 | 0.3292 | 74 | 58 | `StandardScaler`, `IsolationForest`, `n_estimators=200`, `max_samples=4096`, `max_features=0.5`, `top_anomaly_rate=0.002`, non supervise, 48 modeles entraines, 288 combinaisons evaluees | Interessant comme detecteur non supervise, mais pas competitif ici |
 
 ## Pistes d'exploration (upgrades simples)
 
