@@ -22,9 +22,6 @@ def add_isolation_score_feature(X_train, X_test):
     # This avoids data leakage:
     # the test set must not influence the feature creation step.
     isolation_model = make_pipeline(
-        # Isolation Forest uses random splits.
-        # Scaling keeps all columns on a comparable numeric scale before the
-        # anomaly model sees them.
         StandardScaler(),
         IsolationForest(
             n_estimators=200,
